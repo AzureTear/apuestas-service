@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apuestas-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: apuestas-service
+  template:
+    metadata:
+      labels:
+        app: apuestas-service
+    spec:
+      containers:
+      - name: apuestas-service
+        image: 742075245664.dkr.ecr.us-east-1.amazonaws.com/apuestas-service:latest
+        ports:
+        - containerPort: 8005
+        envFrom:
+        - secretRef:
+            name: casino-secrets
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: 8005
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8005
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          failureThreshold: 5
+        resources:
+          requests:
+            cpu: "100m"
+          limits:
+            cpu: "300m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apuestas-service
+spec:
+  selector:
+    app: apuestas-service
+  ports:
+  - port: 8005
+    targetPort: 8005
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: apuestas-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: apuestas-service
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50
